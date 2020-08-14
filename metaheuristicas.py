@@ -6,6 +6,7 @@ Created on Thu Aug 13 17:20:49 2020
 @author: joel
 """
 import numpy as np 
+from numpy.random import random_sample
 
 class Particle():
     """
@@ -13,10 +14,10 @@ class Particle():
     
     Parameters
     ----------
-    pos : Numpy array or list of size N where N is the dimension of the search
+    pos : Numpy array of size N where N is the dimension of the search
           space.
            Initial position
-    vel : Numpy array or list of size N where N is the dimension of the search
+    vel : Numpy array of size N where N is the dimension of the search
           space.
            Initial velocity
     Returns
@@ -24,12 +25,11 @@ class Particle():
     None.
     """
     def __init__(self, pos, vel):
-        pass
-
         
-        self.pos = pos 
-        self.vel = vel
+        self.pos = np.copy(pos)
+        self.vel = np.copy(vel)
         self.b_pos = None
+        
         
         
 class PSOOptimizer():
@@ -65,6 +65,7 @@ class PSOOptimizer():
        self.w = w 
        self.s_fac = s_fac
        self.c_fac = c_fac
+       self.population = None
        
     
     def optimize(self, n_part, n_iter):
@@ -83,4 +84,72 @@ class PSOOptimizer():
         None.
 
         """
-        pass
+        if self.population:
+            self._clearPopulation()
+        
+        self.population = self._createPopulation(n_part)
+        
+        
+    def _createPopulation(self, n_part):
+        """
+        Creates population of n particles
+
+        Parameters
+        ----------
+        n_part : int
+            Number of particles to create the population with.
+
+        Returns
+        -------
+        List with n particles
+
+        """
+        population = []
+        
+        for i in range(n_part):
+            pos = np.empty(len(self.bounds.keys()))
+            
+            for i, lims in enumerate(self.bounds.values()):
+                pos[i] = (lims[1] - lims [0])*random_sample() + lims[0]
+            
+            vel = random_sample(pos.shape)
+            
+            population.append(Particle(pos,vel)) 
+            
+        return population
+
+                         
+    
+    def _clearPopulation(self):
+        """
+        Makes population == None
+        
+        Returns
+        -------
+        None.
+
+        """
+        self.population = None 
+        
+    def _getPopInfo(self):
+        """
+        Function to get Population information. In the future will be used
+        to create optimization logs.
+
+        Returns
+        -------
+        None.
+
+        """
+        for particle in self.population:
+            print(particle.pos)
+            print(particle.vel)
+            
+        
+  
+bounds = {'x': [-2,2],
+          'y': [9,10]}
+
+pso = PSOOptimizer(2,bounds)
+pso.optimize(4,2)
+pso._getPopInfo()
