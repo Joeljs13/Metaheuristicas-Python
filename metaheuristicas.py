@@ -66,6 +66,9 @@ class PSOOptimizer():
        self.s_fac = s_fac
        self.c_fac = c_fac
        self.population = None
+       self.positions = None
+       self.fitness = None
+       self.g_pos = None
        
     
     def optimize(self, n_part, n_iter):
@@ -87,7 +90,20 @@ class PSOOptimizer():
         if self.population:
             self._clearPopulation()
         
-        self.population = self._createPopulation(n_part)
+        if self.fitness:
+            self.fitness = None
+            
+        if self.g_pos:
+            self.g_pos = None
+            
+        if self.positions:
+            self.positions = None
+        
+        self.population, self.positions = self._createPopulation(n_part)
+        self.fitness = self._evaluatePopulation()
+        
+        self._movePopulation()
+        
         
         
     def _createPopulation(self, n_part):
@@ -101,10 +117,12 @@ class PSOOptimizer():
 
         Returns
         -------
-        List with n particles
+        List with n particles. Matrix of n x m with n particles in a m 
+        dimension space
 
         """
         population = []
+        pop_pos = []
         
         for i in range(n_part):
             pos = np.empty(len(self.bounds.keys()))
@@ -115,10 +133,29 @@ class PSOOptimizer():
             vel = random_sample(pos.shape)
             
             population.append(Particle(pos,vel)) 
+            pop_pos.append(pos)
             
-        return population
+        return (population, np.asarray(pop_pos))
 
-                         
+    def _evaluatePopulation(self):
+        """
+        Evaluate the current population
+
+        Returns
+        -------
+        fitness : ndarray (n,) where n is the number of particles
+            Fitness of every particle
+
+        """
+        fitness = np.empty(self.positions.shape[0])
+        
+        for i, position in enumerate(self.positions):
+            fitness[i] = self.func(position)
+            
+        return fitness 
+        
+    def _movePopulation(self):
+        pass                         
     
     def _clearPopulation(self):
         """
@@ -141,15 +178,25 @@ class PSOOptimizer():
         None.
 
         """
-        for particle in self.population:
-            print(particle.pos)
-            print(particle.vel)
-            
+        print(self.positions.shape)
+        print(self.positions)
+        print(self.fitness.shape)
+        print(self.fitness)
+       
         
   
 bounds = {'x': [-2,2],
-          'y': [9,10]}
+          'y': [9,10],
+          'z': [-3,-1]}
 
-pso = PSOOptimizer(2,bounds)
+def sum(x):
+    sum = 0 
+    for i in x:
+        sum += i
+        
+    return sum 
+
+pso = PSOOptimizer(sum, bounds)
 pso.optimize(4,2)
 pso._getPopInfo()
+
