@@ -7,6 +7,7 @@ Created on Thu Aug 13 17:20:49 2020
 """
 import numpy as np 
 from numpy.random import random_sample
+import pandas as pd
 
 class Particle():
     """
@@ -67,14 +68,13 @@ class PSOOptimizer():
        self.c_fac = c_fac
        self.population = None
        self.positions = None
-       self.fitness = None
        self.g_pos = None
        
     
     def optimize(self, n_part, n_iter):
         """
+        This function optimize the function given
         
-
         Parameters
         ----------
         n_part : int
@@ -89,18 +89,12 @@ class PSOOptimizer():
         """
         if self.population:
             self._clearPopulation()
-        
-        if self.fitness:
-            self.fitness = None
+                
+        self.g_pos = None
+        self.positions = np.zeros((n_part, len(self.bounds.keys()) + 1))
             
-        if self.g_pos:
-            self.g_pos = None
-            
-        if self.positions:
-            self.positions = None
-        
-        self.population, self.positions = self._createPopulation(n_part)
-        self.fitness = self._evaluatePopulation()
+        self.population = self._createPopulation(n_part)
+        #self.fitness = self._evaluatePopulation()
         
         self._movePopulation()
         
@@ -117,25 +111,25 @@ class PSOOptimizer():
 
         Returns
         -------
-        List with n particles. Matrix of n x m with n particles in a m 
-        dimension space
+        List with n particles. 
 
         """
         population = []
-        pop_pos = []
+        print(self.positions)
         
+
+        for j, lims in enumerate(self.bounds.values()):
+            self.positions[:,j] = (lims[1] - lims [0])*random_sample(n_part) + lims[0]
+            
         for i in range(n_part):
-            pos = np.empty(len(self.bounds.keys()))
+            vel = random_sample(len(self.bounds.keys()))
+            population.append(Particle(self.positions[i,:-1],vel)) 
+       
+        self._evaluatePopulation()
+        print(self.positions)
+
             
-            for i, lims in enumerate(self.bounds.values()):
-                pos[i] = (lims[1] - lims [0])*random_sample() + lims[0]
-            
-            vel = random_sample(pos.shape)
-            
-            population.append(Particle(pos,vel)) 
-            pop_pos.append(pos)
-            
-        return (population, np.asarray(pop_pos))
+        return population
 
     def _evaluatePopulation(self):
         """
@@ -143,19 +137,18 @@ class PSOOptimizer():
 
         Returns
         -------
-        fitness : ndarray (n,) where n is the number of particles
-            Fitness of every particle
+        None
 
         """
-        fitness = np.empty(self.positions.shape[0])
         
         for i, position in enumerate(self.positions):
-            fitness[i] = self.func(position)
+            self.positions[i,-1] = self.func(position)
             
-        return fitness 
         
     def _movePopulation(self):
-        pass                         
+        for particle in enumerate(self.population):
+            break
+                                     
     
     def _clearPopulation(self):
         """
@@ -180,8 +173,7 @@ class PSOOptimizer():
         """
         print(self.positions.shape)
         print(self.positions)
-        print(self.fitness.shape)
-        print(self.fitness)
+   
        
         
   
@@ -199,4 +191,3 @@ def sum(x):
 pso = PSOOptimizer(sum, bounds)
 pso.optimize(4,2)
 pso._getPopInfo()
-
