@@ -9,6 +9,7 @@ import numpy as np
 from numpy.random import random_sample
 import pandas as pd
 
+
 class Particle():
     """
     Particle class.
@@ -67,10 +68,8 @@ class PSOOptimizer():
        self.s_fac = s_fac
        self.c_fac = c_fac
        self.population = None
-       self.positions = None
        self.g_pos = None
-       
-    
+           
     def optimize(self, n_part, n_iter):
         """
         This function optimize the function given
@@ -89,13 +88,11 @@ class PSOOptimizer():
         """
         if self.population:
             self._clearPopulation()
-                
-        self.g_pos = None
-        self.positions = np.zeros((n_part, len(self.bounds.keys()) + 1))
-            
-        self.population = self._createPopulation(n_part)
-        #self.fitness = self._evaluatePopulation()
         
+        self.g_pos = None
+            
+        self._createPopulation(n_part)   
+      
         self._movePopulation()
         
         
@@ -111,38 +108,44 @@ class PSOOptimizer():
 
         Returns
         -------
-        List with n particles. 
+        None
 
         """
-        population = []
-        print(self.positions)
         
-
+        columns = ['Position',
+                   'Velocity',
+                   'Fitness',
+                   'Best_pos']
+        
+        self.population = pd.DataFrame(index=range(n_part),
+                                       columns = columns)
+        
+        dim = len(self.bounds.values())
+        
+        rand_mat = random_sample((n_part, dim))
         for j, lims in enumerate(self.bounds.values()):
-            self.positions[:,j] = (lims[1] - lims [0])*random_sample(n_part) + lims[0]
-            
-        for i in range(n_part):
-            vel = random_sample(len(self.bounds.keys()))
-            population.append(Particle(self.positions[i,:-1],vel)) 
-       
-        self._evaluatePopulation()
-        print(self.positions)
+            rand_mat[:,j] = (lims[1] - lims [0])*rand_mat[:,j] + lims[0]
 
-            
-        return population
-
+        self.population.loc[:,'Position'] = list(rand_mat)
+        self.population.loc[:, 'Best_pos'] = list(rand_mat)
+        self.population.loc[:,'Velocity'] = list(random_sample((n_part, dim)))
+               
+        
+        idx_min = self._evaluatePopulation()
+        self.g_pos = self.population.iloc[idx_min,0]
+        
     def _evaluatePopulation(self):
         """
         Evaluate the current population
 
         Returns
         -------
-        None
+        Idx min of the fitness
 
         """
+        self.population.loc[:,'Fitness'] = self.func(self.population.loc[:,'Position'])
         
-        for i, position in enumerate(self.positions):
-            self.positions[i,-1] = self.func(position)
+        return self.population.loc[:,'Fitness'].idxmin()
             
         
     def _movePopulation(self):
@@ -171,23 +174,27 @@ class PSOOptimizer():
         None.
 
         """
-        print(self.positions.shape)
-        print(self.positions)
+        pass
    
        
         
   
-bounds = {'x': [-2,2],
+bounds = {'x': [1,2],
           'y': [9,10],
           'z': [-3,-1]}
 
 def sum(x):
-    sum = 0 
-    for i in x:
-        sum += i
+    results = []
+    r = 0
+    for pos in x:
+        r = 0 
+        for c in pos:
+            r += c
         
-    return sum 
+        results.append(r)
+ 
+    return results
 
 pso = PSOOptimizer(sum, bounds)
 pso.optimize(4,2)
-pso._getPopInfo()
+#pso._getPopInfo()
