@@ -9,30 +9,6 @@ import numpy as np
 from numpy.random import random_sample
 import pandas as pd
 
-
-class Particle():
-    """
-    Particle class.
-    
-    Parameters
-    ----------
-    pos : Numpy array of size N where N is the dimension of the search
-          space.
-           Initial position
-    vel : Numpy array of size N where N is the dimension of the search
-          space.
-           Initial velocity
-    Returns
-    -------
-    None.
-    """
-    def __init__(self, pos, vel):
-        
-        self.pos = np.copy(pos)
-        self.vel = np.copy(vel)
-        self.b_pos = None
-        
-        
         
 class PSOOptimizer():
     """
@@ -54,14 +30,15 @@ class PSOOptimizer():
             Social factor of the particles. The default is 2.05.
     c_fac : Scalar, optional
             Cognitive factor of the particles. The default is 2.05.
-
+    k     : Boolean, optional
+            Factor with which velocities are multiplied. The default is True
     Returns
     -------
     None.
 
     """
     
-    def __init__(self, func, bounds, w=0.9, s_fac=2.05, c_fac=2.05):
+    def __init__(self, func, bounds, w=0.9, s_fac=2.05, c_fac=2.05, k=True):
        self.func = func
        self.bounds = bounds
        self.w = w 
@@ -69,6 +46,17 @@ class PSOOptimizer():
        self.c_fac = c_fac
        self.population = None
        self.g_pos = None
+       self.dec_w = 0
+       if k and (s_fac + c_fac > 4):
+           phi = s_fac + c_fac 
+           self.k = 2/np.abs(2-phi-np.sqrt(phi**2 - 4*phi))
+       elif k and (s_fac + c_fac < 4):
+           print('If k == True then social factor + cognitive factor must be > 4')
+           print('k has been set to False')
+           self.k = 0
+       else:
+           self.k = 0
+   
            
     def optimize(self, n_part, n_iter):
         """
@@ -90,11 +78,12 @@ class PSOOptimizer():
             self._clearPopulation()
         
         self.g_pos = None
+        self.dec_w = self.w/n_iter
             
         self._createPopulation(n_part)   
-      
-        self._movePopulation()
         
+        self._movePopulation(n_part, self.k)
+      
         
         
     def _createPopulation(self, n_part):
@@ -148,11 +137,92 @@ class PSOOptimizer():
         return self.population.loc[:,'Fitness'].idxmin()
             
         
-    def _movePopulation(self):
-        for particle in enumerate(self.population):
-            break
-                                     
+    def _movePopulation(self, npart, k):
+        """
+        Moves every particle
+
+        Returns
+        -------
+        None.
+
+        """
+
+        self._calc_new_velocities(npart, k)        
+        self._calc_new_positions(npart)
     
+        
+    def _calc_new_velocities(self, npart, k):
+        """
+        Function to calculate new velocities
+
+        Parameters
+        ----------
+        npart : Int
+            Number of particles.
+        k : Float
+            Factor with which velocites are multiplied.
+
+        Returns
+        -------
+        None.
+
+        """
+        rn = random_sample(2*npart)
+        
+        if k: 
+            for i in range(npart):
+                s_f = self.c_fac*rn[2*i]*(self.population.iloc[i,3]-self.population.iloc[i,0])
+                p_f = self.s_fac*rn[2*i+1]*(self.g_pos-self.population.iloc[i,0])
+                n_vel = k * (self.w*self.population.loc[i,'Velocity'] + s_f + p_f)
+                self.population.loc[i,'Velocity'] = [[x] for x in n_vel]
+            
+        else:
+            for i in range(npart):
+                s_f = self.c_fac*rn[2*i]*(self.population.iloc[i,3]-self.population.iloc[i,0])
+                p_f = self.s_fac*rn[2*i+1]*(self.g_pos-self.population.iloc[i,0])
+                n_vel = self.w*self.population.loc[i,'Velocity'] + s_f + p_f
+                self.population.loc[i,'Velocity'] = [[x] for x in n_vel]
+          
+        self.w -= self.dec_w
+        
+    def _calc_new_positions(self,npart):
+        """
+        Function to calculate new positions
+
+        Parameters
+        ----------
+        npart : Int
+            Number of particles.
+
+        Returns
+        -------
+        None.
+
+        """
+        for i in range(npart):
+            self.population.loc[i,'Position'] = self._checkPosition(i)
+            
+    def _checkPosition(self,i):
+        """
+        Check positions and handles bounds violations
+
+        Parameters
+        ----------
+        i : Int
+            Index of particle to check position.
+
+        Returns
+        -------
+        list
+            Position in a way that avoids bugs with Pandas.
+
+        """
+        n_pos = self.population.loc[i,'Position'] + self.population.loc[i,'Velocity']
+        
+        return [[x] for x in n_pos]
+        
+        
+                
     def _clearPopulation(self):
         """
         Makes population == None
@@ -160,11 +230,14 @@ class PSOOptimizer():
         Returns
         -------
         None.
-
         """
+        
         self.population = None 
         
-    def _getPopInfo(self):
+
+    
+        
+    def _getPopInfo(self, col='Fitness'):
         """
         Function to get Population information. In the future will be used
         to create optimization logs.
@@ -174,14 +247,20 @@ class PSOOptimizer():
         None.
 
         """
-        pass
+        if col == 'all':
+            print(self.population)
+        else:
+            try:
+                print(self.population.loc[:,col])
+            except:
+                print("'{}' is not a valid option".format(col))
    
        
         
   
 bounds = {'x': [1,2],
-          'y': [9,10],
-          'z': [-3,-1]}
+          'y': [9,10],}
+          #'z': [-3,-1]}
 
 def sum(x):
     results = []
@@ -196,5 +275,6 @@ def sum(x):
     return results
 
 pso = PSOOptimizer(sum, bounds)
-pso.optimize(4,2)
-#pso._getPopInfo()
+pso.optimize(2,2)
+#pso._getPopInfo('Position')
+#pso._getPopInfo('Velocity')
