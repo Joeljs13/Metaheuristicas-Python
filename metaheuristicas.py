@@ -7,8 +7,16 @@ Created on Thu Aug 13 17:20:49 2020
 """
 import numpy as np 
 from numpy.random import random_sample
-import pandas as pd
+from operator import attrgetter
 
+class Particle():
+    def __init__(self, pos, vel, b_pos):
+        self.pos = pos.copy() 
+        self.vel = vel.copy()
+        self.b_pos = b_pos.copy()
+        self.fitness = np.inf
+        self.bp_fitness = np.inf
+        
         
 class PSOOptimizer():
     """
@@ -46,6 +54,7 @@ class PSOOptimizer():
        self.c_fac = c_fac
        self.population = None
        self.g_pos = None
+       self.fg_pos = np.inf
        self.dec_w = 0
        if k and (s_fac + c_fac > 4):
            phi = s_fac + c_fac 
@@ -78,13 +87,25 @@ class PSOOptimizer():
             self._clearPopulation()
         
         self.g_pos = None
+        self.fg_pos = np.inf
         self.dec_w = self.w/n_iter
-            
-        self._createPopulation(n_part)   
         
-        self._movePopulation(n_part, self.k)
-      
         
+        self._createPopulation(n_part) 
+        for p in pso.population:
+            print(p.pos)
+            print(p.vel)
+            print(p.b_pos)
+            print(p.fitness)
+            print(p.bp_fitness)
+            print()
+        print(self.g_pos)
+        print(self.fg_pos)
+        for i in range(n_iter):
+            self._movePopulation(n_part, self.k)
+           # self._getPopInfo('all')
+           # print(self.g_pos)
+           # print(self.fg_pos)
         
     def _createPopulation(self, n_part):
         """
@@ -101,29 +122,24 @@ class PSOOptimizer():
 
         """
         
-        columns = ['Position',
-                   'Velocity',
-                   'Fitness',
-                   'Best_pos']
         
-        self.population = pd.DataFrame(index=range(n_part),
-                                       columns = columns)
-        
+        self.population = []
         dim = len(self.bounds.values())
         
         rand_mat = random_sample((n_part, dim))
         for j, lims in enumerate(self.bounds.values()):
             rand_mat[:,j] = (lims[1] - lims [0])*rand_mat[:,j] + lims[0]
-
-        self.population.loc[:,'Position'] = list(rand_mat)
-        self.population.loc[:, 'Best_pos'] = list(rand_mat)
-        self.population.loc[:,'Velocity'] = list(random_sample((n_part, dim)))
-               
         
-        idx_min = self._evaluatePopulation()
-        self.g_pos = self.population.iloc[idx_min,0]
+        for i in range(n_part):
+            self.population.append(Particle(rand_mat[i,:], random_sample(dim), rand_mat[i,:]))
+   
+     
+        idx_min = self._evaluatePopulation(n_part)
+        if self.population[idx_min].fitness < self.fg_pos:
+            self.g_pos = self.population[idx_min].pos
+            self.fg_pos = self.population[idx_min].fitness
         
-    def _evaluatePopulation(self):
+    def _evaluatePopulation(self, npart):
         """
         Evaluate the current population
 
@@ -132,9 +148,14 @@ class PSOOptimizer():
         Idx min of the fitness
 
         """
-        self.population.loc[:,'Fitness'] = self.func(self.population.loc[:,'Position'])
+        for i in range(npart):
+            fitness = self.func(self.population[i].pos)
+            self.population[i].fitness = fitness 
+            if self.population[i].fitness < self.population[i].bp_fitness:
+                self.population[i].b_pos = self.population[i].pos.copy()
+                self.population[i].bp_fitness = fitness
         
-        return self.population.loc[:,'Fitness'].idxmin()
+        return self.population.index(min(self.population, key=attrgetter('fitness')))
             
         
     def _movePopulation(self, npart, k):
@@ -146,9 +167,14 @@ class PSOOptimizer():
         None.
 
         """
-
+        
         self._calc_new_velocities(npart, k)        
         self._calc_new_positions(npart)
+        
+        idx_min = self._evaluatePopulation(npart)
+        if self.population[idx_min].fitness < self.fg_pos:
+            self.g_pos = self.population[idx_min].pos
+            self.fg_pos = self.population[idx_min].fitness
     
         
     def _calc_new_velocities(self, npart, k):
@@ -171,17 +197,16 @@ class PSOOptimizer():
         
         if k: 
             for i in range(npart):
-                s_f = self.c_fac*rn[2*i]*(self.population.iloc[i,3]-self.population.iloc[i,0])
-                p_f = self.s_fac*rn[2*i+1]*(self.g_pos-self.population.iloc[i,0])
-                n_vel = k * (self.w*self.population.loc[i,'Velocity'] + s_f + p_f)
-                self.population.loc[i,'Velocity'] = [[x] for x in n_vel]
-            
+                p_f = self.c_fac*rn[2*i]*(self.population[i].b_pos-self.population[i].pos)
+                s_f = self.s_fac*rn[2*i+1]*(self.g_pos-self.population[i].pos)
+                n_vel = k * (self.w*self.population[i].vel + s_f + p_f)
+                self.population[i].vel = n_vel               
         else:
             for i in range(npart):
-                s_f = self.c_fac*rn[2*i]*(self.population.iloc[i,3]-self.population.iloc[i,0])
-                p_f = self.s_fac*rn[2*i+1]*(self.g_pos-self.population.iloc[i,0])
-                n_vel = self.w*self.population.loc[i,'Velocity'] + s_f + p_f
-                self.population.loc[i,'Velocity'] = [[x] for x in n_vel]
+                p_f = self.c_fac*rn[2*i]*(self.population[i].b_pos-self.population[i].pos)
+                s_f = self.s_fac*rn[2*i+1]*(self.g_pos-self.population[i].pos)
+                n_vel = self.w*self.population[i].vel + s_f + p_f
+                self.population[i].vel = n_vel 
           
         self.w -= self.dec_w
         
@@ -200,7 +225,7 @@ class PSOOptimizer():
 
         """
         for i in range(npart):
-            self.population.loc[i,'Position'] = self._checkPosition(i)
+            self.population[i].pos = self._checkPosition(i)
             
     def _checkPosition(self,i):
         """
@@ -217,9 +242,9 @@ class PSOOptimizer():
             Position in a way that avoids bugs with Pandas.
 
         """
-        n_pos = self.population.loc[i,'Position'] + self.population.loc[i,'Velocity']
+        n_pos = self.population[i].pos + self.population[i].vel
         
-        return [[x] for x in n_pos]
+        return n_pos.copy()
         
         
                 
@@ -248,7 +273,7 @@ class PSOOptimizer():
 
         """
         if col == 'all':
-            print(self.population)
+            print(self.population.to_string())
         else:
             try:
                 print(self.population.loc[:,col])
@@ -258,23 +283,35 @@ class PSOOptimizer():
        
         
   
-bounds = {'x': [1,2],
-          'y': [9,10],}
-          #'z': [-3,-1]}
+bounds = {'x': [-10,10],
+          'y': [-10,10],
+          'z': [-10,10]}
 
 def sum(x):
-    results = []
     r = 0
-    for pos in x:
-        r = 0 
-        for c in pos:
-            r += c
-        
-        results.append(r)
- 
-    return results
+    for c in x:
+        r += c
+    
+    return r
 
-pso = PSOOptimizer(sum, bounds)
-pso.optimize(2,2)
+def sphere(x):
+    r = 0
+    for c in x:
+        r+= c**2
+        
+    return r
+
+pso = PSOOptimizer(sphere, bounds)
+pso.optimize(8,10)
+for p in pso.population:
+    print(p.pos)
+    print(p.vel)
+    print(p.b_pos)
+    print(p.fitness)
+    print(p.bp_fitness)
+    print()
+print(pso.g_pos)
+print(pso.fg_pos)
 #pso._getPopInfo('Position')
 #pso._getPopInfo('Velocity')
+
