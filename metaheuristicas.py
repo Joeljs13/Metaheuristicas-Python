@@ -8,6 +8,7 @@ Created on Thu Aug 13 17:20:49 2020
 import numpy as np 
 from numpy.random import random_sample
 from operator import attrgetter
+import pandas as pd 
 
 class Particle():
     def __init__(self, pos, vel, b_pos):
@@ -56,6 +57,7 @@ class PSOOptimizer():
        self.g_pos = None
        self.fg_pos = np.inf
        self.dec_w = 0
+       self.history = {}
        if k and (s_fac + c_fac > 4):
            phi = s_fac + c_fac 
            self.k = 2/np.abs(2-phi-np.sqrt(phi**2 - 4*phi))
@@ -85,22 +87,14 @@ class PSOOptimizer():
         """
         if self.population:
             self._clearPopulation()
-        
+        self.history = {}
         self.g_pos = None
         self.fg_pos = np.inf
         self.dec_w = self.w/n_iter
+        self.i = 0
         
         
         self._createPopulation(n_part) 
-        for p in pso.population:
-            print(p.pos)
-            print(p.vel)
-            print(p.b_pos)
-            print(p.fitness)
-            print(p.bp_fitness)
-            print()
-        print(self.g_pos)
-        print(self.fg_pos)
         for i in range(n_iter):
             self._movePopulation(n_part, self.k)
            # self._getPopInfo('all')
@@ -124,6 +118,7 @@ class PSOOptimizer():
         
         
         self.population = []
+        
         dim = len(self.bounds.values())
         
         rand_mat = random_sample((n_part, dim))
@@ -138,7 +133,8 @@ class PSOOptimizer():
         if self.population[idx_min].fitness < self.fg_pos:
             self.g_pos = self.population[idx_min].pos
             self.fg_pos = self.population[idx_min].fitness
-        
+        self._getPopInfo()
+        self.i += 1
     def _evaluatePopulation(self, npart):
         """
         Evaluate the current population
@@ -175,6 +171,8 @@ class PSOOptimizer():
         if self.population[idx_min].fitness < self.fg_pos:
             self.g_pos = self.population[idx_min].pos
             self.fg_pos = self.population[idx_min].fitness
+        self._getPopInfo()
+        self.i += 1
     
         
     def _calc_new_velocities(self, npart, k):
@@ -262,7 +260,7 @@ class PSOOptimizer():
 
     
         
-    def _getPopInfo(self, col='Fitness'):
+    def _getPopInfo(self):
         """
         Function to get Population information. In the future will be used
         to create optimization logs.
@@ -272,14 +270,23 @@ class PSOOptimizer():
         None.
 
         """
-        if col == 'all':
-            print(self.population.to_string())
-        else:
-            try:
-                print(self.population.loc[:,col])
-            except:
-                print("'{}' is not a valid option".format(col))
-   
+        pos = []
+        vel = []
+        b_pos = []
+        fitness = []
+        bp_fitness = []
+        for p in self.population:
+            pos.append(p.pos)
+            vel.append(p.vel)
+            b_pos.append(p.b_pos)
+            fitness.append(p.fitness)
+            bp_fitness.append(p.bp_fitness)
+            
+
+            
+        self.history[self.i] = {'Pos':pos,'Vel':vel,'B_pos':b_pos,
+                                'Fitness':fitness, 'BP_fitness':bp_fitness,
+                                'GB_pos':self.g_pos,'GB_fitness':self.fg_pos}
        
         
   
@@ -301,17 +308,11 @@ def sphere(x):
         
     return r
 
-pso = PSOOptimizer(sphere, bounds)
-pso.optimize(8,10)
-for p in pso.population:
-    print(p.pos)
-    print(p.vel)
-    print(p.b_pos)
-    print(p.fitness)
-    print(p.bp_fitness)
-    print()
-print(pso.g_pos)
-print(pso.fg_pos)
-#pso._getPopInfo('Position')
-#pso._getPopInfo('Velocity')
+pso = PSOOptimizer(sum, bounds)
+pso.optimize(5,2)
 
+
+
+#df = pd.DataFrame.from_dict(pso.history, orient="columns").stack().to_frame()
+#df = pd.DataFrame(df[0].values.tolist(), index=df.index)
+#df.T
