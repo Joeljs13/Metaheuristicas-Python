@@ -8,7 +8,7 @@ Created on Thu Aug 13 17:20:49 2020
 import numpy as np 
 from numpy.random import random_sample
 from operator import attrgetter
-import pandas as pd 
+
 
 class Particle():
     def __init__(self, pos, vel, b_pos):
@@ -69,7 +69,7 @@ class PSOOptimizer():
            self.k = 0
    
            
-    def optimize(self, n_part, n_iter):
+    def optimize(self, n_part, n_iter,b_handling='None'):
         """
         This function optimize the function given
         
@@ -96,7 +96,7 @@ class PSOOptimizer():
         
         self._createPopulation(n_part) 
         for i in range(n_iter):
-            self._movePopulation(n_part, self.k)
+            self._movePopulation(n_part, self.k, b_handling)
            # self._getPopInfo('all')
            # print(self.g_pos)
            # print(self.fg_pos)
@@ -154,7 +154,7 @@ class PSOOptimizer():
         return self.population.index(min(self.population, key=attrgetter('fitness')))
             
         
-    def _movePopulation(self, npart, k):
+    def _movePopulation(self, npart, k, b_handling):
         """
         Moves every particle
 
@@ -165,7 +165,7 @@ class PSOOptimizer():
         """
         
         self._calc_new_velocities(npart, k)        
-        self._calc_new_positions(npart)
+        self._calc_new_positions(npart, b_handling)
         
         idx_min = self._evaluatePopulation(npart)
         if self.population[idx_min].fitness < self.fg_pos:
@@ -208,7 +208,7 @@ class PSOOptimizer():
           
         self.w -= self.dec_w
         
-    def _calc_new_positions(self,npart):
+    def _calc_new_positions(self,npart,b_handling):
         """
         Function to calculate new positions
 
@@ -223,9 +223,9 @@ class PSOOptimizer():
 
         """
         for i in range(npart):
-            self.population[i].pos = self._checkPosition(i)
+            self.population[i].pos = self._checkPosition(i,b_handling)
             
-    def _checkPosition(self,i):
+    def _checkPosition(self,i,b_handling):
         """
         Check positions and handles bounds violations
 
@@ -240,7 +240,13 @@ class PSOOptimizer():
             Position in a way that avoids bugs with Pandas.
 
         """
-        n_pos = self.population[i].pos + self.population[i].vel
+        if b_handling == 'None':
+            n_pos = self.population[i].pos + self.population[i].vel
+        elif b_handling == 'inf':
+            n_pos = self.population[i].pos + self.population[i].vel
+            for k, values in enumerate(self.bounds.values()):
+                if self.population[i].pos[k] < values[0] or self.population[i].pos[k] > values[1]:
+                    print('f')               
         
         return n_pos.copy()
         
@@ -291,8 +297,8 @@ class PSOOptimizer():
         
   
 bounds = {'x': [-10,10],
-          'y': [-10,10],
-          'z': [-10,10]}
+          'y': [-10,10],}
+          #'z': [-10,10]}
 
 def sum(x):
     r = 0
@@ -309,7 +315,9 @@ def sphere(x):
     return r
 
 pso = PSOOptimizer(sum, bounds)
-pso.optimize(5,2)
+pso.optimize(2,3,b_handling='None')
+print(pso.g_pos)
+
 
 
 
