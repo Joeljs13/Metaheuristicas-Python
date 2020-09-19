@@ -20,7 +20,7 @@ class Particle():
         self.bounds = bounds
         self.eval = True
         
-    def _checkPosition(self,b_handling):
+    def _checkPosition(self,b_handling='none'):
         """
         Check positions and handles bounds violations
 
@@ -37,21 +37,47 @@ class Particle():
         """
         self.eval = True
         n_pos = self.pos +self.vel
-        for k, values in enumerate(self.bounds.values()):
-            if n_pos[k] < values[0] or n_pos[k] > values[1]: 
-                if b_handling == 'none':
-                    self.pos += self.vel 
-                    return
-                elif b_handling == 'inf':
+        if b_handling == 'none':
+            self.pos = n_pos.copy()
+            return
+        elif b_handling == 'inf':
+            for k, values in enumerate(self.bounds.values()):
+                if n_pos[k] < values[0] or n_pos[k] > values[1]: 
                     self.eval = False
                     self.pos += self.vel
                     self.fitness = np.inf 
                     return
-                elif b_handling == 'nearest':
-                    if n_pos[k] < values[0]:
-                        self.pos[k] = values[0]
-                    else:
-                        self.pos[k] = values[1]
+        elif b_handling == 'nearest':
+            for k, values in enumerate(self.bounds.values()):
+                if n_pos[k] < values[0]:
+                    self.pos[k] = values[0]
+                elif n_pos[k] > values[1]:
+                    self.pos[k] = values[1]
+                else:
+                    self.pos[k] = n_pos[k]
+        elif b_handling == 'pbest':
+            for k, values in enumerate(self.bounds.values()):
+                if n_pos[k] < values[0] or n_pos[k] > values[1]: 
+                    self.pos = self.b_pos.copy()
+                    return
+        elif b_handling == 'reflect':
+            for k, values in enumerate(self.bounds.values()):
+                if n_pos[k] < values[0]:
+                    self.pos[k] = 2*values[0]-n_pos[k]
+                elif n_pos[k] > values[1]:
+                    self.pos[k] = 2*values[1]-n_pos[k]
+                else:
+                    self.pos[k] = n_pos[k]
+        elif b_handling == 'random':
+            for k, values in enumerate(self.bounds.values()):
+                if n_pos[k] < values[0] or n_pos[k] > values[1]: 
+                    rand_pos = random_sample(len(n_pos))
+                    for j, lims in enumerate(self.bounds.values()):
+                        rand_pos[j] = (lims[1] - lims [0])*rand_pos[j] + lims[0]
+                    self.pos = rand_pos.copy()
+                    return
+                    
+            
                     
   
            
@@ -317,11 +343,11 @@ class PSOOptimizer():
        
         
   
-bounds = {'x': [-5,5],
-          'y': [-5,5],
-          'z': [-5,5]}
+bounds = {'x': [-10,10],
+          'y': [-10,10],
+          'z': [-10,10]}
 
-def sum(x):
+def suma(x):
     r = 0
     for c in x:
         r += c
@@ -335,14 +361,21 @@ def sphere(x):
         
     return r
 
-pso = PSOOptimizer(sum, bounds)
-pso.optimize(10,10,b_handling='nearest')
+def avg_fitness(f,bounds,b_handling, times):
+    fitness_arr = np.empty(times)
+    for i in range(times):  
+        pso = PSOOptimizer(f, bounds)
+        pso.optimize(15,15,b_handling=b_handling)
+        fitness_arr[i] = pso.fg_pos
+        print('Iteración: ',i+1)
+        print(pso.g_pos)
+        print(pso.fg_pos)
+        print()
+    print('Se utilizo la tecnica: ', b_handling)
+    print('El fitness promedio es: ', fitness_arr.mean())
 
-print(pso.g_pos)
-print(pso.fg_pos)
 
-
-
+avg_fitness(sphere,bounds,'inf', 10)
 
 
 
