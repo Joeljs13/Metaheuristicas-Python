@@ -11,13 +11,50 @@ from operator import attrgetter
 
 
 class Particle():
-    def __init__(self, pos, vel, b_pos):
+    def __init__(self, pos, vel, b_pos, bounds):
         self.pos = pos.copy() 
         self.vel = vel.copy()
         self.b_pos = b_pos.copy()
         self.fitness = np.inf
         self.bp_fitness = np.inf
+        self.bounds = bounds
+        self.eval = True
         
+    def _checkPosition(self,b_handling):
+        """
+        Check positions and handles bounds violations
+
+        Parameters
+        ----------
+        i : Int
+        Index of particle to check position.
+    
+        Returns
+        -------
+        list
+        Position in a way that avoids bugs with Pandas.
+        
+        """
+        self.eval = True
+        n_pos = self.pos +self.vel
+        for k, values in enumerate(self.bounds.values()):
+            if n_pos[k] < values[0] or n_pos[k] > values[1]: 
+                if b_handling == 'none':
+                    self.pos += self.vel 
+                    return
+                elif b_handling == 'inf':
+                    self.eval = False
+                    self.pos += self.vel
+                    self.fitness = np.inf 
+                    return
+                elif b_handling == 'nearest':
+                    if n_pos[k] < values[0]:
+                        self.pos[k] = values[0]
+                    else:
+                        self.pos[k] = values[1]
+                    
+  
+           
         
 class PSOOptimizer():
     """
@@ -69,7 +106,7 @@ class PSOOptimizer():
            self.k = 0
    
            
-    def optimize(self, n_part, n_iter,b_handling='None'):
+    def optimize(self, n_part, n_iter,b_handling='none'):
         """
         This function optimize the function given
         
@@ -95,11 +132,18 @@ class PSOOptimizer():
         
         
         self._createPopulation(n_part) 
+        #for p in self.population:
+        #    print(p.pos)
+        #    print(p.fitness)
+        #print()
         for i in range(n_iter):
             self._movePopulation(n_part, self.k, b_handling)
-           # self._getPopInfo('all')
-           # print(self.g_pos)
-           # print(self.fg_pos)
+         #   for p in self.population:
+         #       print(p.pos)
+         #       print(p.fitness)
+         #   print(self.fg_pos)
+         #   print()
+           
         
     def _createPopulation(self, n_part):
         """
@@ -126,7 +170,7 @@ class PSOOptimizer():
             rand_mat[:,j] = (lims[1] - lims [0])*rand_mat[:,j] + lims[0]
         
         for i in range(n_part):
-            self.population.append(Particle(rand_mat[i,:], random_sample(dim), rand_mat[i,:]))
+            self.population.append(Particle(rand_mat[i,:], random_sample(dim), rand_mat[i,:],self.bounds))
    
      
         idx_min = self._evaluatePopulation(n_part)
@@ -145,8 +189,9 @@ class PSOOptimizer():
 
         """
         for i in range(npart):
-            fitness = self.func(self.population[i].pos)
-            self.population[i].fitness = fitness 
+            if self.population[i].eval:
+                fitness = self.func(self.population[i].pos)
+                self.population[i].fitness = fitness 
             if self.population[i].fitness < self.population[i].bp_fitness:
                 self.population[i].b_pos = self.population[i].pos.copy()
                 self.population[i].bp_fitness = fitness
@@ -163,7 +208,7 @@ class PSOOptimizer():
         None.
 
         """
-        
+       
         self._calc_new_velocities(npart, k)        
         self._calc_new_positions(npart, b_handling)
         
@@ -173,6 +218,7 @@ class PSOOptimizer():
             self.fg_pos = self.population[idx_min].fitness
         self._getPopInfo()
         self.i += 1
+        
     
         
     def _calc_new_velocities(self, npart, k):
@@ -223,33 +269,9 @@ class PSOOptimizer():
 
         """
         for i in range(npart):
-            self.population[i].pos = self._checkPosition(i,b_handling)
-            
-    def _checkPosition(self,i,b_handling):
-        """
-        Check positions and handles bounds violations
+            self.population[i]._checkPosition(b_handling)
 
-        Parameters
-        ----------
-        i : Int
-            Index of particle to check position.
 
-        Returns
-        -------
-        list
-            Position in a way that avoids bugs with Pandas.
-
-        """
-        if b_handling == 'None':
-            n_pos = self.population[i].pos + self.population[i].vel
-        elif b_handling == 'inf':
-            n_pos = self.population[i].pos + self.population[i].vel
-            for k, values in enumerate(self.bounds.values()):
-                if self.population[i].pos[k] < values[0] or self.population[i].pos[k] > values[1]:
-                    print('f')               
-        
-        return n_pos.copy()
-        
         
                 
     def _clearPopulation(self):
@@ -288,17 +310,16 @@ class PSOOptimizer():
             fitness.append(p.fitness)
             bp_fitness.append(p.bp_fitness)
             
-
-            
+   
         self.history[self.i] = {'Pos':pos,'Vel':vel,'B_pos':b_pos,
                                 'Fitness':fitness, 'BP_fitness':bp_fitness,
                                 'GB_pos':self.g_pos,'GB_fitness':self.fg_pos}
        
         
   
-bounds = {'x': [-10,10],
-          'y': [-10,10],}
-          #'z': [-10,10]}
+bounds = {'x': [-5,5],
+          'y': [-5,5],
+          'z': [-5,5]}
 
 def sum(x):
     r = 0
@@ -315,8 +336,12 @@ def sphere(x):
     return r
 
 pso = PSOOptimizer(sum, bounds)
-pso.optimize(2,3,b_handling='None')
+pso.optimize(10,10,b_handling='nearest')
+
 print(pso.g_pos)
+print(pso.fg_pos)
+
+
 
 
 
