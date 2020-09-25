@@ -110,7 +110,7 @@ class PSOOptimizer():
 
     """
     
-    def __init__(self, func, bounds, w=0.9, s_fac=2.05, c_fac=2.05, k=True):
+    def __init__(self, func, bounds, w=0.9, s_fac=2.05, c_fac=2.05, k=True,**kwargs):
        self.func = func
        self.bounds = bounds
        self.w = w 
@@ -130,6 +130,7 @@ class PSOOptimizer():
            self.k = 0
        else:
            self.k = 0
+    
    
            
     def optimize(self, n_part, n_iter,b_handling='none'):
@@ -365,7 +366,7 @@ def avg_fitness(f,bounds,b_handling, times):
     fitness_arr = np.empty(times)
     for i in range(times):  
         pso = PSOOptimizer(f, bounds)
-        pso.optimize(15,15,b_handling=b_handling)
+        pso.optimize(10,10,b_handling=b_handling)
         fitness_arr[i] = pso.fg_pos
         print('Iteración: ',i+1)
         print(pso.g_pos)
@@ -375,7 +376,7 @@ def avg_fitness(f,bounds,b_handling, times):
     print('El fitness promedio es: ', fitness_arr.mean())
 
 
-avg_fitness(sphere,bounds,'inf', 10)
+avg_fitness(sphere,bounds,'random', 10)
 
 
 
